@@ -1,14 +1,15 @@
 accessWidener v1 named
 
-accessible    class    net/minecraft/world/chunk/ChunkStatus$SimpleGenerationTask
-accessible    class    net/minecraft/world/chunk/ChunkStatus$LoadTask
-accessible    class    net/minecraft/world/chunk/ChunkStatus$GenerationTask
+accessible    class    net/minecraft/world/chunk/ChunkStatus$SimpleTask
+accessible    class    net/minecraft/world/chunk/ChunkStatus$NoGenTask
+accessible    class    net/minecraft/world/chunk/ChunkStatus$Task
 accessible    class    net/minecraft/world/storage/StorageIoWorker$Result
 accessible    class    net/minecraft/server/world/ServerChunkManager$MainThreadExecutor
 
 accessible    method    net/minecraft/world/storage/RegionBasedStorage    <init>    (Ljava/io/File;Z)V
 accessible    method    net/minecraft/world/storage/RegionBasedStorage    getRegionFile    (Lnet/minecraft/util/math/ChunkPos;)Lnet/minecraft/world/storage/RegionFile;
 accessible    method    net/minecraft/world/storage/RegionBasedStorage    write    (Lnet/minecraft/util/math/ChunkPos;Lnet/minecraft/nbt/CompoundTag;)V
+accessible    method    net/minecraft/world/storage/StorageIoWorker    <init>    (Lnet/minecraft/world/storage/RegionBasedStorage;Ljava/lang/String;)V
 accessible    method    net/minecraft/util/collection/WeightedList    <init>    (Ljava/util/List;)V
 accessible    method    net/minecraft/server/world/ServerChunkManager    tick    ()Z
 accessible    method    net/minecraft/server/world/ServerChunkManager$MainThreadExecutor    runTask    ()Z

@@ -50,9 +50,9 @@ public class C2MECachedRegionStorage extends StorageIoWorker {
 
     private final AtomicBoolean isClosed = new AtomicBoolean(false);
 
-    public C2MECachedRegionStorage(File file, boolean bl, String string) {
-        super(file, bl, string);
-        this.storage = new RegionBasedStorage(file, bl);
+    public C2MECachedRegionStorage(RegionBasedStorage storage, String name) {
+        super(storage, name);
+        this.storage = storage;
         this.chunkCache = CacheBuilder.newBuilder()
                 .concurrencyLevel(Runtime.getRuntime().availableProcessors() * 2)
                 .expireAfterAccess(3, TimeUnit.SECONDS)
@@ -177,11 +177,6 @@ public class C2MECachedRegionStorage extends StorageIoWorker {
     @Override
     public CompletableFuture<Void> completeAll() {
         chunkCache.invalidateAll();
-        try {
-            storage.method_26982();
-        } catch (Throwable t) {
-            LOGGER.warn("Failed to synchronized chunks", t);
-        }
         return CompletableFuture.allOf(writeFutures.values().toArray(CompletableFuture[]::new));
     }
 

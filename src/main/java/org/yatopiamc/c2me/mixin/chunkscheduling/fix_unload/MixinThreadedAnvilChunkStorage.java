@@ -25,10 +25,10 @@ public abstract class MixinThreadedAnvilChunkStorage {
 
     @Shadow @Final private ThreadExecutor<Runnable> mainThreadExecutor;
 
-    @Shadow protected abstract void unloadChunks(BooleanSupplier shouldKeepTicking);
-
     @Mutable
     @Shadow @Final private LongSet unloadedChunks;
+
+    @Shadow protected abstract void method_20605(BooleanSupplier booleanSupplier);
 
     /**
      * @author ishland
@@ -46,9 +46,9 @@ public abstract class MixinThreadedAnvilChunkStorage {
         pointOfInterestStorage.tick(ShouldKeepTickingUtils.minimumTicks(shouldKeepTicking, 32));
     }
 
-    @Redirect(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ThreadedAnvilChunkStorage;unloadChunks(Ljava/util/function/BooleanSupplier;)V"))
+    @Redirect(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ThreadedAnvilChunkStorage;method_20605(Ljava/util/function/BooleanSupplier;)V"))
     private void redirectTickUnloadChunks(ThreadedAnvilChunkStorage threadedAnvilChunkStorage, BooleanSupplier shouldKeepTicking) {
-        this.unloadChunks(ShouldKeepTickingUtils.minimumTicks(shouldKeepTicking, 32));
+        this.method_20605(ShouldKeepTickingUtils.minimumTicks(shouldKeepTicking, 32));
     }
 
     @Inject(method = "<init>", at = @At("RETURN"))

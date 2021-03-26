@@ -1,5 +1,5 @@
 package org.yatopiamc.c2me.mixin.threading.worldgen;
-
+/* TODO
 import net.minecraft.block.Block;
 import net.minecraft.structure.Structure;
 import org.spongepowered.asm.mixin.Final;
@@ -26,3 +26,4 @@ public class MixinStructurePalettedBlockInfoList {
     }
 
 }
+*/

@@ -11,6 +11,7 @@ import org.spongepowered.asm.mixin.Mutable;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.yatopiamc.c2me.common.threading.chunkio.C2MECachedRegionStorage;
 
@@ -26,10 +27,12 @@ public abstract class MixinStorageIoWorker {
     @Mutable
     @Shadow @Final private Map<ChunkPos, StorageIoWorker.Result> results;
 
-    @Mutable
-    @Shadow @Final private TaskExecutor<TaskQueue.PrioritizedTask> field_24468;
-
     @Shadow @Final private AtomicBoolean closed;
+
+    @Redirect(method = "<init>", at = @At(value = "INVOKE", target = "Ljava/lang/Thread;start()V"))
+    private void onThreadStart(Thread thread) {
+        // NO-OP
+    }
 
     @Inject(method = "<init>", at = @At("RETURN"))
     private void onPostInit(CallbackInfo info) {
@@ -37,7 +40,6 @@ public abstract class MixinStorageIoWorker {
         if (((Object) this) instanceof C2MECachedRegionStorage) {
             this.storage = null;
             this.results = null;
-            this.field_24468 = null;
             this.closed.set(true);
         }
     }

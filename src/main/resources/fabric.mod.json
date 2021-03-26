@@ -25,9 +25,9 @@
     "c2me.mixins.json"
   ],
   "depends": {
-    "fabricloader": ">=0.11.1",
+    "fabricloader": ">=0.11.3",
     "java": ">=11",
-    "minecraft": ">=1.16.4"
+    "minecraft": "=1.15.2"
   },
   "breaks": {
     "tic_tacs": "*"

@@ -6,10 +6,10 @@ import net.minecraft.SharedConstants;
 import net.minecraft.datafixer.DataFixTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtHelper;
-import net.minecraft.util.registry.RegistryKey;
 import net.minecraft.world.FeatureUpdater;
 import net.minecraft.world.PersistentStateManager;
-import net.minecraft.world.World;
+import net.minecraft.world.dimension.DimensionType;
+import net.minecraft.world.storage.RegionBasedStorage;
 import net.minecraft.world.storage.StorageIoWorker;
 import net.minecraft.world.storage.VersionedChunkStorage;
 import org.jetbrains.annotations.Nullable;
@@ -34,8 +34,8 @@ public abstract class MixinVersionedChunkStorage {
     @Shadow @Nullable private FeatureUpdater featureUpdater;
 
     @Redirect(method = "<init>", at = @At(value = "NEW", target = "net/minecraft/world/storage/StorageIoWorker"))
-    private StorageIoWorker onStorageIoInit(File file, boolean bl, String string) {
-        return new C2MECachedRegionStorage(file, bl, string);
+    private StorageIoWorker onStorageIoInit(RegionBasedStorage storage, String name) {
+        return new C2MECachedRegionStorage(storage, name);
     }
 
     private AsyncLock featureUpdaterLock = AsyncLock.createFair();
@@ -50,7 +50,7 @@ public abstract class MixinVersionedChunkStorage {
      * @reason async loading
      */
     @Overwrite
-    public CompoundTag updateChunkTag(RegistryKey<World> registryKey, Supplier<PersistentStateManager> persistentStateManagerFactory, CompoundTag tag) {
+    public CompoundTag updateChunkTag(DimensionType dimensionType, Supplier<PersistentStateManager> persistentStateManagerFactory, CompoundTag tag) {
         // TODO [VanillaCopy] - check when updating minecraft version
         int i = VersionedChunkStorage.getDataVersion(tag);
         if (i < 1493) {
@@ -58,7 +58,7 @@ public abstract class MixinVersionedChunkStorage {
                 tag = NbtHelper.update(this.dataFixer, DataFixTypes.CHUNK, tag, i, 1493);
                 if (tag.getCompound("Level").getBoolean("hasLegacyStructureData")) {
                     if (this.featureUpdater == null) {
-                        this.featureUpdater = FeatureUpdater.create(registryKey, (PersistentStateManager)persistentStateManagerFactory.get());
+                        this.featureUpdater = FeatureUpdater.create(dimensionType, (PersistentStateManager)persistentStateManagerFactory.get());
                     }
 
                     tag = this.featureUpdater.getUpdatedReferences(tag);

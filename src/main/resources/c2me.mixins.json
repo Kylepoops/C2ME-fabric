@@ -24,9 +24,7 @@
     "threading.worldgen.MixinChunkStatus",
     "threading.worldgen.MixinServerWorld",
     "threading.worldgen.MixinStructureManager",
-    "threading.worldgen.MixinStructurePalettedBlockInfoList",
     "threading.worldgen.MixinThreadedAnvilChunkStorage",
-    "threading.worldgen.MixinWeightedBlockStateProvider",
     "util.log4j2shutdownhookisnomore.MixinMain",
     "util.log4j2shutdownhookisnomore.MixinMinecraftDedicatedServer",
     "util.progresslogger.MixinWorldGenerationProgressLogger"

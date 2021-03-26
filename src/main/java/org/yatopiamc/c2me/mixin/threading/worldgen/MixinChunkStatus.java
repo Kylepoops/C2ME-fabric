@@ -22,23 +22,21 @@ import java.util.function.Function;
 @Mixin(ChunkStatus.class)
 public class MixinChunkStatus {
 
-    @Shadow
-    @Final
-    private ChunkStatus.GenerationTask generationTask;
-
     @Shadow @Final public static ChunkStatus FEATURES;
+
+    @Shadow @Final private ChunkStatus.Task task;
 
     /**
      * @author ishland
      * @reason take over generation
      */
     @Overwrite
-    public CompletableFuture<Either<Chunk, ChunkHolder.Unloaded>> runGenerationTask(ServerWorld world, ChunkGenerator chunkGenerator, StructureManager structureManager, ServerLightingProvider lightingProvider, Function<Chunk, CompletableFuture<Either<Chunk, ChunkHolder.Unloaded>>> function, List<Chunk> chunks) {
-        final Chunk targetChunk = chunks.get(chunks.size() / 2);
+    public CompletableFuture<Either<Chunk, ChunkHolder.Unloaded>> runTask(ServerWorld serverWorld, ChunkGenerator<?> chunkGenerator, StructureManager structureManager, ServerLightingProvider serverLightingProvider, Function<Chunk, CompletableFuture<Either<Chunk, ChunkHolder.Unloaded>>> function, List<Chunk> list) {
+        final Chunk targetChunk = list.get(list.size() / 2);
         //noinspection ConstantConditions
-        return ChunkStatusUtils.runChunkGenWithLock(targetChunk.getPos(), (Object) this == FEATURES ? 1 : 0, ((IWorldGenLockable) world).getWorldGenChunkLock(), () ->
-                ChunkStatusUtils.getThreadingType((ChunkStatus) (Object) this).runTask(((IWorldGenLockable) world).getWorldGenSingleThreadedLock(), () ->
-                        this.generationTask.doWork((ChunkStatus) (Object) this, world, chunkGenerator, structureManager, lightingProvider, function, chunks, targetChunk)
+        return ChunkStatusUtils.runChunkGenWithLock(targetChunk.getPos(), (Object) this == FEATURES ? 1 : 0, ((IWorldGenLockable) serverWorld).getWorldGenChunkLock(), () ->
+                ChunkStatusUtils.getThreadingType((ChunkStatus) (Object) this).runTask(((IWorldGenLockable) serverWorld).getWorldGenSingleThreadedLock(), () ->
+                        this.task.doWork((ChunkStatus) (Object) this, serverWorld, chunkGenerator, structureManager, serverLightingProvider, function, list, targetChunk)
                 )
         );
     }

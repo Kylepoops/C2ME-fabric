@@ -17,6 +17,7 @@ import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.thread.ThreadExecutor;
 import net.minecraft.world.ChunkSerializer;
 import net.minecraft.world.PersistentStateManager;
+import net.minecraft.world.SessionLockException;
 import net.minecraft.world.TickScheduler;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkStatus;
@@ -26,6 +27,7 @@ import net.minecraft.world.chunk.light.LightingProvider;
 import net.minecraft.world.poi.PointOfInterestStorage;
 import net.minecraft.world.storage.VersionedChunkStorage;
 import org.apache.logging.log4j.Logger;
+import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Dynamic;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -43,6 +45,7 @@ import org.yatopiamc.c2me.common.threading.chunkio.ISerializingRegionBasedStorag
 import org.yatopiamc.c2me.common.util.SneakyThrow;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
@@ -54,9 +57,6 @@ import java.util.function.Supplier;
 @Mixin(ThreadedAnvilChunkStorage.class)
 public abstract class MixinThreadedAnvilChunkStorage extends VersionedChunkStorage implements ChunkHolder.PlayersWatchingChunkProvider {
 
-    public MixinThreadedAnvilChunkStorage(File file, DataFixer dataFixer, boolean bl) {
-        super(file, dataFixer, bl);
-    }
 
     @Shadow
     @Final
@@ -71,14 +71,8 @@ public abstract class MixinThreadedAnvilChunkStorage extends VersionedChunkStora
     private PointOfInterestStorage pointOfInterestStorage;
 
     @Shadow
-    protected abstract byte method_27053(ChunkPos chunkPos, ChunkStatus.ChunkType chunkType);
-
-    @Shadow
     @Final
     private static Logger LOGGER;
-
-    @Shadow
-    protected abstract void method_27054(ChunkPos chunkPos);
 
     @Shadow
     @Final
@@ -88,8 +82,11 @@ public abstract class MixinThreadedAnvilChunkStorage extends VersionedChunkStora
     @Final
     private ThreadExecutor<Runnable> mainThreadExecutor;
 
-    @Shadow
-    protected abstract boolean method_27055(ChunkPos chunkPos);
+    @Shadow @Nullable protected abstract CompoundTag getUpdatedChunkTag(ChunkPos pos) throws IOException;
+
+    public MixinThreadedAnvilChunkStorage(File file, DataFixer dataFixer) {
+        super(file, dataFixer);
+    }
 
     private AsyncNamedLock<ChunkPos> chunkLock = AsyncNamedLock.createFair();
 
@@ -105,7 +102,7 @@ public abstract class MixinThreadedAnvilChunkStorage extends VersionedChunkStora
      * @reason async io and deserialization
      */
     @Overwrite
-    private CompletableFuture<Either<Chunk, ChunkHolder.Unloaded>> loadChunk(ChunkPos pos) {
+    private CompletableFuture<Either<Chunk, ChunkHolder.Unloaded>> method_20619(ChunkPos pos) {
         if (scheduledChunks == null) scheduledChunks = new HashSet<>();
         synchronized (scheduledChunks) {
             if (scheduledChunks.contains(pos)) throw new IllegalArgumentException("Already scheduled");
@@ -132,10 +129,8 @@ public abstract class MixinThreadedAnvilChunkStorage extends VersionedChunkStora
             ChunkIoMainThreadTaskUtils.drainQueue();
             if (protoChunk != null) {
                 protoChunk.setLastSaveTime(this.world.getTime());
-                this.method_27053(pos, protoChunk.getStatus().getChunkType());
                 return Either.left(protoChunk);
             } else {
-                this.method_27054(pos);
                 return Either.left(new ProtoChunk(pos, UpgradeData.NO_UPGRADE_DATA));
             }
         }, this.mainThreadExecutor);
@@ -183,7 +178,7 @@ public abstract class MixinThreadedAnvilChunkStorage extends VersionedChunkStora
     private CompletableFuture<CompoundTag> getUpdatedChunkTagAtAsync(ChunkPos pos) {
         return chunkLock.acquireLock(pos).toCompletableFuture().thenCompose(lockToken -> ((C2MECachedRegionStorage) this.worker).getNbtAtAsync(pos).thenApply(compoundTag -> {
             if (compoundTag != null)
-                return this.updateChunkTag(this.world.getRegistryKey(), this.persistentStateManagerFactory, compoundTag);
+                return this.updateChunkTag(this.world.getDimension().getType(), this.persistentStateManagerFactory, compoundTag);
             else return null;
         }).handle((tag, throwable) -> {
             lockToken.releaseLock();
@@ -203,14 +198,23 @@ public abstract class MixinThreadedAnvilChunkStorage extends VersionedChunkStora
         if (!chunk.needsSaving()) {
             return false;
         } else {
+            try {
+                this.world.checkSessionLock();
+            } catch (SessionLockException var6) {
+                LOGGER.error((String)"Couldn't save chunk; already in use by another instance of Minecraft?", (Throwable)var6);
+                return false;
+            }
+
             chunk.setLastSaveTime(this.world.getTime());
             chunk.setShouldSave(false);
             ChunkPos chunkPos = chunk.getPos();
 
             try {
                 ChunkStatus chunkStatus = chunk.getStatus();
-                if (chunkStatus.getChunkType() != ChunkStatus.ChunkType.field_12807) {
-                    if (this.method_27055(chunkPos)) {
+                CompoundTag compoundTag;
+                if (chunkStatus.getChunkType() != ChunkStatus.ChunkType.LEVELCHUNK) {
+                    compoundTag = this.getUpdatedChunkTag(chunkPos);
+                    if (compoundTag != null && ChunkSerializer.getChunkType(compoundTag) == ChunkStatus.ChunkType.LEVELCHUNK) {
                         return false;
                     }
 
@@ -219,7 +223,6 @@ public abstract class MixinThreadedAnvilChunkStorage extends VersionedChunkStora
                     }
                 }
 
-                this.world.getProfiler().visit("chunkSave");
                 // C2ME start - async serialization
                 if (saveFutures == null) saveFutures = new ConcurrentLinkedQueue<>();
                 AsyncSerializationManager.Scope scope = new AsyncSerializationManager.Scope(chunk, world);
@@ -234,18 +237,17 @@ public abstract class MixinThreadedAnvilChunkStorage extends VersionedChunkStora
                                 AsyncSerializationManager.pop(scope);
                             }
                         }, ChunkIoThreadingExecutorUtils.serializerExecutor)
-                                .thenAcceptAsync(compoundTag -> this.setTagAt(chunkPos, compoundTag), this.mainThreadExecutor)
+                                .thenAcceptAsync(compoundTag1 -> this.setTagAt(chunkPos, compoundTag1), this.mainThreadExecutor)
                                 .handle((unused, throwable) -> {
-                            lockToken.releaseLock();
-                            if (throwable != null)
-                                LOGGER.error("Failed to save chunk {},{}", chunkPos.x, chunkPos.z, throwable);
-                            return unused;
-                        })));
-                this.method_27053(chunkPos, chunkStatus.getChunkType());
+                                    lockToken.releaseLock();
+                                    if (throwable != null)
+                                        LOGGER.error("Failed to save chunk {},{}", chunkPos.x, chunkPos.z, throwable);
+                                    return unused;
+                                })));
                 // C2ME end
                 return true;
             } catch (Exception var5) {
-                LOGGER.error("Failed to save chunk {},{}",  chunkPos.x, chunkPos.z, var5);
+                LOGGER.error((String)"Failed to save chunk {},{}", (Object)chunkPos.x, chunkPos.z, var5);
                 return false;
             }
         }

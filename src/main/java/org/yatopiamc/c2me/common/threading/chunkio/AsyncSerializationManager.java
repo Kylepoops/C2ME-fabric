@@ -72,14 +72,14 @@ public class AsyncSerializationManager {
                 this.blockTickScheduler = (TickScheduler<Block>) ((DeepCloneable) blockTickScheduler).deepClone();
             } else {
                 final ServerTickScheduler<Block> worldBlockTickScheduler = world.getBlockTickScheduler();
-                this.blockTickScheduler = new SimpleTickScheduler<>(Registry.BLOCK::getId, worldBlockTickScheduler.getScheduledTicksInChunk(chunk.getPos(), false, true), world.getTime());
+                this.blockTickScheduler = new SimpleTickScheduler<>(Registry.BLOCK::getId, worldBlockTickScheduler.getScheduledTicksInChunk(chunk.getPos(), false, true));
             }
             final TickScheduler<Fluid> fluidTickScheduler = chunk.getFluidTickScheduler();
             if (fluidTickScheduler instanceof DeepCloneable) {
                 this.fluidTickScheduler = (TickScheduler<Fluid>) ((DeepCloneable) fluidTickScheduler).deepClone();
             } else {
                 final ServerTickScheduler<Fluid> worldFluidTickScheduler = world.getFluidTickScheduler();
-                this.fluidTickScheduler = new SimpleTickScheduler<>(Registry.FLUID::getId, worldFluidTickScheduler.getScheduledTicksInChunk(chunk.getPos(), false, true), world.getTime());
+                this.fluidTickScheduler = new SimpleTickScheduler<>(Registry.FLUID::getId, worldFluidTickScheduler.getScheduledTicksInChunk(chunk.getPos(), false, true));
             }
             this.blockEntities = chunk.getBlockEntityPositions().stream().map(chunk::getBlockEntity).filter(Objects::nonNull).filter(blockEntity -> !blockEntity.isRemoved()).collect(Collectors.toMap(BlockEntity::getPos, Function.identity()));
         }
@@ -99,7 +99,7 @@ public class AsyncSerializationManager {
                 this.lightType = type;
                 for (int i = -1; i < 17; i++) {
                     final ChunkSectionPos sectionPos = ChunkSectionPos.from(pos, i);
-                    ChunkNibbleArray lighting = provider.get(type).getLightSection(sectionPos);
+                    ChunkNibbleArray lighting = provider.get(type).getLightArray(sectionPos);
                     cachedData.put(sectionPos, lighting != null ? lighting.copy() : null);
                 }
             }
@@ -109,13 +109,13 @@ public class AsyncSerializationManager {
             }
 
             @Override
-            public void setSectionStatus(ChunkSectionPos pos, boolean notReady) {
+            public void updateSectionStatus(ChunkSectionPos pos, boolean notReady) {
                 throw new UnsupportedOperationException();
             }
 
             @NotNull
             @Override
-            public ChunkNibbleArray getLightSection(ChunkSectionPos pos) {
+            public ChunkNibbleArray getLightArray(ChunkSectionPos pos) {
                 return cachedData.getOrDefault(pos, EMPTY);
             }
 
